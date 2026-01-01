@@ -13,7 +13,8 @@ const WINNING_LORE = 20;
 
 export const GameBoard: React.FC = () => {
   // --- APP STATE ---
-  const [isAppLoading, setIsAppLoading] = useState(true);
+  // Start as FALSE to ensure immediate rendering of the board
+  const [isAppLoading, setIsAppLoading] = useState(false);
 
   // --- SETTINGS STATE ---
   const [jumpstartEnabled, setJumpstartEnabled] = useState(true);
@@ -112,20 +113,11 @@ export const GameBoard: React.FC = () => {
   // Initial App Load Effect
   useEffect(() => {
     const bootstrapApp = async () => {
-        // 1. Minimum splash screen time for aesthetics
-        const minLoadTime = new Promise(resolve => setTimeout(resolve, 2500));
+        // Fetch Logic (Non-blocking for immediate UI, runs in background)
+        fetchFullLibrary().catch(err => console.error("Library fetch failed", err));
         
-        // 2. Fetch Logic
-        const dataFetch = fetchFullLibrary().catch(err => console.error("Library fetch failed", err));
-        
-        // 3. Initialize Game Logic
+        // Initialize Game Logic immediately with local starter deck
         initializeGame();
-
-        // Wait for timer
-        await minLoadTime;
-        
-        // Reveal App
-        setIsAppLoading(false);
     };
 
     bootstrapApp();

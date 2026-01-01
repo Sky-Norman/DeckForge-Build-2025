@@ -1,45 +1,656 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DeckForge - Lorcana Simulator</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeckForge - Static Lorcana Engine</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS (Play CDN for Static Usage) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              cinzel: ['Cinzel', 'serif'],
-            },
-          },
-        },
-      }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        cinzel: ['Cinzel', 'serif'],
+                    },
+                    colors: {
+                        ink: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                        },
+                        lore: '#f59e0b', // Amber
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                    }
+                }
+            }
+        }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- React & Babel CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #0f172a;
-        color: #e2e8f0;
-      }
+        body { background-color: #0f172a; color: #e2e8f0; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.0"
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+<body>
+    <div id="root">
+        <!-- Static Loading State (Visible while React loads) -->
+        <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617; color: #fbbf24; font-family: 'Cinzel', serif;">
+            <div style="font-size: 2rem; margin-bottom: 1rem; letter-spacing: 0.2em; text-transform: uppercase;">DeckForge</div>
+            <div style="opacity: 0.7; font-family: sans-serif;">Decks are being forged...</div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useReducer, useMemo } = React;
+
+        // --- 1. DATA & CONSTANTS ---
+        
+        // Proxy to bypass CORS/Hotlinking restrictions on lorcanajson.org
+        const getProxiedImageUrl = (url) => `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+
+        // RICH DATA for Text Fallback
+        const STARTER_DECK_DATA = [
+            { 
+                id: '1-001', Name: "The Queen", Cost: 5, Inkable: true, Type: "Character", Class: "Storyborn", 
+                Strength: 4, Willpower: 5, Lore: 2, 
+                Image: "https://lorcanajson.org/images/cards/english/001/001.jpg", 
+                Abilities: ["Wicked and Vain: Exert - Opposing character gets -4 Strength this turn."],
+                Flavor: "Who is the fairest of them all?" 
+            },
+            { 
+                id: '1-012', Name: "Mickey Mouse", Cost: 3, Inkable: true, Type: "Character", Class: "Storyborn", 
+                Strength: 3, Willpower: 3, Lore: 2, 
+                Image: "https://lorcanajson.org/images/cards/english/001/012.jpg", 
+                Flavor: "True Friend. Gosh, it sure is swell to see ya!" 
+            },
+            { 
+                id: '1-023', Name: "Stitch", Cost: 6, Inkable: true, Type: "Character", Class: "Floodborn", 
+                Strength: 3, Willpower: 5, Lore: 3, 
+                Image: "https://lorcanajson.org/images/cards/english/001/023.jpg", 
+                Abilities: ["Shift 4", "Adoring Fans: When you play this character, you may exert all opposing characters."],
+                Flavor: "Rock Star" 
+            },
+            { 
+                id: '1-036', Name: "Magic Broom", Cost: 2, Inkable: true, Type: "Character", Class: "Dreamborn", 
+                Strength: 2, Willpower: 2, Lore: 1, 
+                Image: "https://lorcanajson.org/images/cards/english/001/036.jpg", 
+                Abilities: ["Sweep: When you play this character, you may shuffle a card from any discard into its player's deck."],
+                Flavor: "Industrial Model" 
+            },
+            { 
+                id: '1-106', Name: "Maleficent", Cost: 9, Inkable: false, Type: "Character", Class: "Storyborn", 
+                Strength: 7, Willpower: 5, Lore: 2, 
+                Image: "https://lorcanajson.org/images/cards/english/001/112.jpg", 
+                Abilities: ["Dragon Fire: When you play this character, you may banish chosen opposing character."],
+                Flavor: "The Mistress of All Evil" 
+            },
+            { 
+                id: '1-142', Name: "Belle", Cost: 4, Inkable: true, Type: "Character", Class: "Storyborn", 
+                Strength: 2, Willpower: 4, Lore: 3, 
+                Image: "https://lorcanajson.org/images/cards/english/001/142.jpg", 
+                Abilities: ["Read a Book: During your turn, you may put an additional card from your hand into your inkwell face down."],
+                Flavor: "Strange but Special" 
+            },
+            { 
+                id: '1-196', Name: "Smash", Cost: 3, Inkable: true, Type: "Action", Class: "", 
+                Image: "https://lorcanajson.org/images/cards/english/001/196.jpg", 
+                Abilities: ["Deal 3 damage to chosen character."],
+                Flavor: "Hulk Smash!" 
+            },
+            { 
+                id: '1-119', Name: "Robin Hood", Cost: 6, Inkable: true, Type: "Character", Class: "Storyborn", 
+                Strength: 4, Willpower: 4, Lore: 2, 
+                Image: "https://lorcanajson.org/images/cards/english/001/119.jpg", 
+                Abilities: ["Good Shot: During your turn, this character gains Evasive."],
+                Flavor: "Unrivaled Archer" 
+            },
+        ];
+
+        // Fill deck to 60 cards
+        const generateDeck = () => {
+            const deck = [];
+            let i = 0;
+            while(deck.length < 60) {
+                const template = STARTER_DECK_DATA[i % STARTER_DECK_DATA.length];
+                deck.push({
+                    ...template,
+                    Image: getProxiedImageUrl(template.Image),
+                    instanceId: `card-${Date.now()}-${Math.random()}`,
+                    isExerted: false,
+                    isDried: true,
+                    isFaceDown: false,
+                    damage: 0,
+                    location: 'DECK'
+                });
+                i++;
+            }
+            return deck.sort(() => Math.random() - 0.5);
+        };
+
+        // --- 2. ICONS (SVG Components) ---
+        const Icon = ({ path, size = 20, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Sword: <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />,
+            Shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+            Zap: <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
+            RotateCcw: <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" />,
+            RefreshCw: <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 12" />,
+            Droplet: <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.74A17.16 17.16 0 0 0 12 2v20z" />,
+            Scroll: <path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 0a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8z" />,
+            Trophy: <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6m12 5h1.5a2.5 2.5 0 0 0 0-5H18m-10 6.03V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v9.03M6 15l2-2m10 2l-2-2m-8 6h12a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2z" />
+        };
+
+        // --- 3. GAME ENGINE LOGIC ---
+
+        const INITIAL_STATE = {
+            turn: 1,
+            lore: 0,
+            inkCommitted: false,
+            deck: [],
+            hand: [],
+            inkwell: [],
+            field: [],
+            discard: [],
+            opponentField: [],
+            opponentLore: 0,
+            selectedCardId: null,
+            history: [] // For Undo
+        };
+
+        const drawCards = (state, count) => {
+            if(state.deck.length < count) return state;
+            const newDeck = [...state.deck];
+            const drawn = newDeck.splice(0, count).map(c => ({...c, location: 'HAND'}));
+            return {
+                ...state,
+                deck: newDeck,
+                hand: [...state.hand, ...drawn]
+            };
+        };
+
+        const addToInkwell = (state, cardId) => {
+            if(state.inkCommitted) return state; // Rule: 1 ink per turn
+            
+            const cardIndex = state.hand.findIndex(c => c.instanceId === cardId);
+            if(cardIndex === -1) return state;
+            
+            const card = state.hand[cardIndex];
+            if(!card.Inkable) return state;
+
+            const newHand = [...state.hand];
+            newHand.splice(cardIndex, 1);
+
+            const inkedCard = { ...card, location: 'INKWELL', isFaceDown: true, isExerted: false };
+            
+            return {
+                ...state,
+                hand: newHand,
+                inkwell: [...state.inkwell, inkedCard],
+                inkCommitted: true
+            };
+        };
+
+        const playCard = (state, cardId) => {
+            const cardIndex = state.hand.findIndex(c => c.instanceId === cardId);
+            if(cardIndex === -1) return state;
+            const card = state.hand[cardIndex];
+
+            // Ink Cost Check
+            const availableInk = state.inkwell.filter(c => !c.isExerted).length;
+            if(availableInk < card.Cost) return state;
+
+            // Pay Cost (Exert Ink)
+            let costPaid = 0;
+            const newInkwell = state.inkwell.map(ink => {
+                if(costPaid < card.Cost && !ink.isExerted) {
+                    costPaid++;
+                    return { ...ink, isExerted: true };
+                }
+                return ink;
+            });
+
+            // Move Card
+            const newHand = [...state.hand];
+            newHand.splice(cardIndex, 1);
+            
+            const playedCard = { ...card, location: 'FIELD', isDried: true, isExerted: false };
+
+            return {
+                ...state,
+                inkwell: newInkwell,
+                hand: newHand,
+                field: [...state.field, playedCard]
+            };
+        };
+
+        const quest = (state, cardId) => {
+            const cardIndex = state.field.findIndex(c => c.instanceId === cardId);
+            if(cardIndex === -1) return state;
+            const card = state.field[cardIndex];
+
+            if(card.isExerted || card.isDried) return state;
+
+            const newField = [...state.field];
+            newField[cardIndex] = { ...card, isExerted: true };
+
+            return {
+                ...state,
+                field: newField,
+                lore: state.lore + (card.Lore || 0),
+                selectedCardId: null
+            };
+        };
+
+        const endTurn = (state) => {
+            // Ready Phase Logic
+            const readyField = state.field.map(c => ({ ...c, isExerted: false, isDried: false }));
+            const readyInk = state.inkwell.map(c => ({ ...c, isExerted: false }));
+            
+            let newState = {
+                ...state,
+                turn: state.turn + 1,
+                inkCommitted: false,
+                field: readyField,
+                inkwell: readyInk
+            };
+            
+            // Draw Phase
+            return drawCards(newState, 1);
+        };
+
+        // --- 4. COMPONENTS ---
+
+        const Card = ({ card, onClick, isSelected, context }) => {
+            const [imageError, setImageError] = useState(false);
+
+            if(card.isFaceDown) {
+                return (
+                    <div className={`relative w-20 h-28 bg-slate-800 rounded border-2 border-slate-700 shadow-lg ${card.isExerted ? 'rotate-90 ml-4' : ''}`}>
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/black-scales.png')] opacity-30"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="flex flex-col items-center opacity-50">
+                                <Icon path={Icons.Droplet} size={16} className="text-amber-600" />
+                                <span className="text-[9px] font-cinzel text-slate-500">INK</span>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            const isHand = context === 'HAND';
+            const isField = context === 'FIELD';
+
+            return (
+                <div 
+                    onClick={() => onClick(card.instanceId)}
+                    className={`
+                        relative w-32 h-48 bg-slate-900 rounded-lg border transition-all duration-200 cursor-pointer overflow-hidden
+                        ${isSelected ? 'ring-2 ring-amber-400 border-amber-500 scale-105 z-20' : 'border-slate-700 hover:border-slate-500'}
+                        ${isHand ? 'hover:-translate-y-6 hover:shadow-xl' : ''}
+                        ${card.isExerted ? 'rotate-3 translate-y-1 grayscale-[0.3]' : ''}
+                        ${card.isDried && isField ? 'opacity-80' : ''}
+                    `}
+                >
+                    {/* --- Image Layer (Show if no error) --- */}
+                    {!imageError && (
+                        <img 
+                            src={card.Image} 
+                            className="absolute inset-0 w-full h-full object-cover z-0" 
+                            alt={card.Name} 
+                            onError={() => setImageError(true)}
+                        />
+                    )}
+
+                    {/* --- Fallback / Text Mode Layer (Show if Image Error) --- */}
+                    {imageError && (
+                        <div className="absolute inset-0 bg-slate-800 flex flex-col p-2 z-10">
+                            {/* Header: Cost & Name */}
+                            <div className="flex justify-between items-start mb-1">
+                                <div className="relative">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs font-cinzel text-slate-900 shadow-lg z-20 relative ${card.Inkable ? 'bg-amber-400' : 'bg-slate-400'}`}>
+                                        {card.Cost}
+                                    </div>
+                                    {card.Inkable && (
+                                        <div className="absolute -inset-1 rounded-full border border-amber-500/50 animate-pulse"></div>
+                                    )}
+                                </div>
+                                <div className="flex-1 ml-1 mt-0.5 overflow-hidden">
+                                    <div className="text-[9px] leading-tight font-bold text-slate-900 bg-white/90 px-1 py-0.5 rounded-r border-l-2 border-slate-800 shadow-sm font-cinzel truncate">
+                                        {card.Name}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Art Placeholder */}
+                            <div className="h-16 bg-slate-900/50 rounded border border-slate-700 mb-1 flex flex-col items-center justify-center relative overflow-hidden">
+                                 <span className="text-slate-500 text-[8px] font-cinzel text-center opacity-70 px-1">
+                                    {card.Type}<br/>
+                                    <span className="italic opacity-50">{card.Class}</span>
+                                 </span>
+                            </div>
+
+                            {/* Stats Row */}
+                            {card.Type === "Character" && (
+                                <div className="flex justify-between items-center px-1 mb-1 bg-slate-900/50 rounded p-0.5 border border-white/5">
+                                    <div className="flex items-center text-[9px] font-bold text-slate-200" title="Strength">
+                                        <Icon path={Icons.Sword} size={10} className="mr-0.5 text-slate-400"/> {card.Strength}
+                                    </div>
+                                    <div className="flex items-center text-[9px] font-bold text-emerald-400 bg-slate-800 px-1 rounded border border-emerald-900" title="Lore">
+                                        <Icon path={Icons.Scroll} size={8} className="mr-0.5 fill-current" /> {card.Lore}
+                                    </div>
+                                    <div className="flex items-center text-[9px] font-bold text-slate-200" title="Willpower">
+                                        <Icon path={Icons.Shield} size={10} className="mr-0.5 text-slate-400"/> {card.Willpower}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Body Text */}
+                            <div className="bg-slate-100/95 rounded p-1.5 flex-1 border border-slate-300 relative overflow-hidden flex flex-col justify-center">
+                                {card.Abilities && card.Abilities.length > 0 ? (
+                                    <div className="text-[7px] text-slate-900 font-serif leading-tight">
+                                        {card.Abilities.map((ability, i) => (
+                                            <p key={i} className="mb-1 last:mb-0">{ability}</p>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[7px] text-slate-500 italic text-center leading-tight">{card.Flavor}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Summoning Sickness Overlay */}
+                    {card.isDried && isField && (
+                        <div className="absolute top-1 right-1 z-30 pointer-events-none">
+                            <span className="block w-2 h-2 rounded-full bg-slate-400 animate-pulse ring-1 ring-black"></span>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [isLoading, setIsLoading] = useState(true);
+            const [state, setState] = useState(INITIAL_STATE);
+
+            // History for Undo
+            const pushHistory = (newState) => {
+                setState(prev => ({
+                    ...newState,
+                    history: [...prev.history, { ...prev, history: [] }] // Save snapshot without recursive history
+                }));
+            };
+
+            const undo = () => {
+                if(state.history.length === 0) return;
+                const previous = state.history[state.history.length - 1];
+                const newHistory = state.history.slice(0, state.history.length - 1);
+                setState({ ...previous, history: newHistory });
+            };
+
+            // Bootstrap
+            useEffect(() => {
+                setTimeout(() => {
+                    const deck = generateDeck();
+                    let newState = { ...INITIAL_STATE, deck };
+                    newState = drawCards(newState, 7); // Initial Hand
+                    
+                    // Dummy Opponent Setup
+                    const oppDeck = generateDeck();
+                    const oppField = oppDeck.slice(0, 3).map(c => ({...c, location: 'FIELD', isExerted: true}));
+                    
+                    newState.opponentField = oppField;
+                    
+                    setState(newState);
+                    setIsLoading(false);
+                }, 1500); // Fake load time
+            }, []);
+
+            // --- Handlers ---
+
+            const handleCardClick = (id) => {
+                const inHand = state.hand.find(c => c.instanceId === id);
+                if(inHand) {
+                    // Context Menu Logic simplified for click: select first, then confirm action
+                    if(state.selectedCardId === id) {
+                        // Double click to play
+                        pushHistory(playCard(state, id));
+                    } else {
+                        setState(prev => ({ ...prev, selectedCardId: id }));
+                    }
+                    return;
+                }
+
+                const inField = state.field.find(c => c.instanceId === id);
+                if(inField) {
+                     if(state.selectedCardId === id) {
+                         // Double click to Quest
+                         pushHistory(quest(state, id));
+                     } else {
+                         setState(prev => ({ ...prev, selectedCardId: id }));
+                     }
+                }
+            };
+
+            const handleInkAction = () => {
+                if(state.selectedCardId) {
+                    pushHistory(addToInkwell(state, state.selectedCardId));
+                    setState(prev => ({...prev, selectedCardId: null}));
+                }
+            };
+
+            const handlePlayAction = () => {
+                if(state.selectedCardId) {
+                    pushHistory(playCard(state, state.selectedCardId));
+                    setState(prev => ({...prev, selectedCardId: null}));
+                }
+            };
+
+            const handleEndTurn = () => {
+                pushHistory(endTurn(state));
+            };
+
+            if (isLoading) return null; // Let the HTML loader show
+
+            const selectedCard = state.hand.find(c => c.instanceId === state.selectedCardId) || state.field.find(c => c.instanceId === state.selectedCardId);
+
+            return (
+                <div className="flex flex-col h-screen w-screen bg-slate-950 overflow-hidden font-sans text-slate-200">
+                    
+                    {/* Top Bar */}
+                    <header className="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 z-50 shadow-md">
+                        <div className="font-cinzel font-bold text-amber-500 text-lg flex items-center gap-2">
+                            <Icon path={Icons.Scroll} /> DECKFORGE
+                        </div>
+
+                        <div className="flex gap-8 items-center">
+                            <div className="text-center">
+                                <div className="text-[10px] text-slate-500 uppercase tracking-widest">Opponent</div>
+                                <div className="text-xl font-cinzel text-red-500">{state.opponentLore} / 20</div>
+                            </div>
+                            <div className="text-center px-4 py-1 bg-slate-800 rounded border border-slate-700">
+                                <div className="text-[10px] text-slate-400">TURN</div>
+                                <div className="font-bold text-lg">{state.turn}</div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-[10px] text-slate-500 uppercase tracking-widest">Player</div>
+                                <div className="text-xl font-cinzel text-emerald-500">{state.lore} / 20</div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={undo} 
+                                disabled={state.history.length === 0}
+                                className="p-2 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                                <Icon path={Icons.RotateCcw} />
+                            </button>
+                            <button 
+                                onClick={handleEndTurn}
+                                className="bg-amber-700 hover:bg-amber-600 text-amber-100 px-4 py-2 rounded flex items-center gap-2 font-cinzel font-bold text-sm transition-colors shadow-lg border border-amber-500/30"
+                            >
+                                End Turn <Icon path={Icons.RefreshCw} size={16} />
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Main Board */}
+                    <main className="flex-1 relative flex flex-col">
+                        {/* Opponent Field */}
+                        <div className="h-1/3 border-b border-slate-800/50 bg-slate-900/30 p-4 flex justify-center gap-4 items-end">
+                             {state.opponentField.map(card => (
+                                 <Card key={card.instanceId} card={card} context="FIELD" onClick={() => {}} />
+                             ))}
+                        </div>
+
+                        {/* Player Field */}
+                        <div className="flex-1 p-4 flex justify-center gap-4 items-start relative">
+                            {state.field.map(card => (
+                                <Card 
+                                    key={card.instanceId} 
+                                    card={card} 
+                                    context="FIELD" 
+                                    isSelected={state.selectedCardId === card.instanceId}
+                                    onClick={handleCardClick}
+                                />
+                            ))}
+                            
+                            {/* Empty State */}
+                            {state.field.length === 0 && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                                    <Icon path={Icons.Sword} size={64} />
+                                </div>
+                            )}
+                        </div>
+                    </main>
+
+                    {/* Controls Bar (Contextual) */}
+                    <div className="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-center gap-4">
+                        {selectedCard ? (
+                            <>
+                                <span className="text-xs text-slate-400 mr-2 border-r border-slate-700 pr-4">{selectedCard.Name}</span>
+                                {selectedCard.location === 'HAND' && (
+                                    <>
+                                        <button 
+                                            onClick={handlePlayAction}
+                                            className="px-4 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-xs font-bold text-white shadow-lg"
+                                        >
+                                            PLAY
+                                        </button>
+                                        {selectedCard.Inkable && !state.inkCommitted && (
+                                            <button 
+                                                onClick={handleInkAction}
+                                                className="px-4 py-1 bg-slate-700 hover:bg-slate-600 border border-amber-600/50 rounded text-xs font-bold text-amber-500 shadow-lg flex items-center gap-2"
+                                            >
+                                                <Icon path={Icons.Droplet} size={12} /> INK
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {selectedCard.location === 'FIELD' && !selectedCard.isExerted && !selectedCard.isDried && (
+                                    <button 
+                                        onClick={() => pushHistory(quest(state, selectedCard.instanceId))}
+                                        className="px-4 py-1 bg-amber-600 hover:bg-amber-500 rounded text-xs font-bold text-white shadow-lg flex items-center gap-2"
+                                    >
+                                        <Icon path={Icons.Scroll} size={12} /> QUEST
+                                    </button>
+                                )}
+                            </>
+                        ) : (
+                            <span className="text-xs text-slate-600 italic">Select a card to act...</span>
+                        )}
+                    </div>
+
+                    {/* Player Hand & Inkwell */}
+                    <div className="h-48 bg-slate-950 border-t-4 border-slate-900 flex relative shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-10">
+                        {/* Inkwell Zone */}
+                        <div className="w-48 bg-slate-900/50 border-r border-slate-800 p-2 flex flex-col items-center">
+                            <div className="text-[10px] font-cinzel text-slate-500 mb-2 flex items-center gap-1">
+                                <Icon path={Icons.Droplet} size={10} /> INKWELL ({state.inkwell.filter(c => !c.isExerted).length}/{state.inkwell.length})
+                            </div>
+                            <div className="flex flex-wrap content-start justify-center gap-1 w-full overflow-y-auto">
+                                {state.inkwell.map(card => (
+                                    <div key={card.instanceId} className="-mb-16 last:mb-0">
+                                        <Card card={card} onClick={() => {}} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Hand Zone */}
+                        <div className="flex-1 flex items-end justify-center pb-4 -space-x-8 px-8">
+                             {state.hand.map((card, idx) => (
+                                 <div key={card.instanceId} className="hover:-translate-y-8 hover:z-50 transition-transform duration-200" style={{zIndex: idx}}>
+                                     <Card 
+                                        card={card} 
+                                        context="HAND" 
+                                        isSelected={state.selectedCardId === card.instanceId}
+                                        onClick={handleCardClick} 
+                                    />
+                                 </div>
+                             ))}
+                        </div>
+
+                        {/* Deck Zone */}
+                        <div className="w-32 bg-slate-900/50 border-l border-slate-800 flex items-center justify-center flex-col gap-2">
+                             <div className="w-16 h-24 rounded bg-slate-800 border border-slate-600 shadow-lg flex items-center justify-center">
+                                 <span className="font-cinzel text-slate-400 font-bold">{state.deck.length}</span>
+                             </div>
+                             <span className="text-[9px] text-slate-600 tracking-widest">DECK</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>
