@@ -6,9 +6,12 @@ interface HandProps {
   cards: GameCard[];
   onPlayCard: (id: string) => void;
   onInkCard: (id: string) => void;
+  // Drag Support
+  onDragStart?: (e: React.DragEvent, id: string) => void;
+  onDragEnd?: () => void;
 }
 
-export const Hand: React.FC<HandProps> = ({ cards, onPlayCard, onInkCard }) => {
+export const Hand: React.FC<HandProps> = ({ cards, onPlayCard, onInkCard, onDragStart, onDragEnd }) => {
   return (
     <div className="relative flex items-end justify-center h-full w-full px-4 perspective-1000">
       <div className="flex -space-x-12 hover:-space-x-4 transition-all duration-300 pb-4">
@@ -18,7 +21,12 @@ export const Hand: React.FC<HandProps> = ({ cards, onPlayCard, onInkCard }) => {
             className="group relative transition-all duration-300 hover:-translate-y-8 hover:z-20"
             style={{ zIndex: index }}
           >
-            <Card card={card} />
+            <Card 
+                card={card} 
+                isDraggable={true} // Enable dragging for all cards in hand
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+            />
             
             {/* Action Buttons on Hover */}
             <div className="absolute -top-10 left-0 right-0 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

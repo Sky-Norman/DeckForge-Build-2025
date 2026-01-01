@@ -5,11 +5,17 @@ import { Droplet } from 'lucide-react';
 
 interface InkwellProps {
   cards: GameCard[];
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
 }
 
-export const Inkwell: React.FC<InkwellProps> = ({ cards }) => {
+export const Inkwell: React.FC<InkwellProps> = ({ cards, onDragOver, onDrop }) => {
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900/50 rounded-xl border border-slate-700/50 p-2 relative">
+    <div 
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className="flex flex-col items-center justify-center h-full w-full bg-slate-900/50 rounded-xl border border-slate-700/50 p-2 relative transition-colors hover:border-amber-500/30"
+    >
       <div className="absolute -top-3 left-4 bg-slate-800 px-2 py-0.5 rounded border border-slate-600 flex items-center gap-2 text-xs text-amber-400 font-cinzel shadow-lg z-10">
         <Droplet size={14} className="fill-amber-400" />
         <span>INKWELL ({cards.length})</span>
