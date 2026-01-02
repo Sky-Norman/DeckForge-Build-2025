@@ -18,7 +18,8 @@ export const Hand: React.FC<HandProps> = ({ cards, onPlayCard, onInkCard, onDrag
         {cards.map((card, index) => (
           <div 
             key={card.instanceId} 
-            className="group relative transition-all duration-300 hover:-translate-y-8 hover:z-20"
+            // Use !z-50 to override the inline style index on hover
+            className="group relative transition-all duration-300 hover:-translate-y-8 hover:!z-50"
             style={{ zIndex: index }}
           >
             <Card 
@@ -29,19 +30,19 @@ export const Hand: React.FC<HandProps> = ({ cards, onPlayCard, onInkCard, onDrag
             />
             
             {/* Action Buttons on Hover */}
-            <div className="absolute -top-10 left-0 right-0 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute -top-12 left-0 right-0 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
                 <button 
                     onClick={() => onPlayCard(card.instanceId)}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 py-1 rounded shadow-lg font-bold"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] px-3 py-1.5 rounded shadow-lg font-bold border border-emerald-400/50 hover:scale-110 transition-transform uppercase tracking-wider"
                 >
-                    PLAY
+                    Play
                 </button>
                 {card.Inkable && (
                     <button 
                         onClick={() => onInkCard(card.instanceId)}
-                        className="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2 py-1 rounded shadow-lg font-bold"
+                        className="bg-amber-600 hover:bg-amber-500 text-white text-[10px] px-3 py-1.5 rounded shadow-lg font-bold border border-amber-400/50 hover:scale-110 transition-transform uppercase tracking-wider"
                     >
-                        INK
+                        Ink
                     </button>
                 )}
             </div>
