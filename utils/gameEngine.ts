@@ -40,6 +40,18 @@ const cleanupBoard = (state: GameState): GameState => {
 
 // --- CORE MECHANICS ---
 
+/**
+ * Swaps the Player and Opponent in the state.
+ * Used for AI calculations and "Sandbox Mode" manual opponent control.
+ */
+export const swapPlayers = (state: GameState): GameState => {
+    return {
+        ...state,
+        player: state.opponent,
+        opponent: state.player
+    };
+};
+
 export const createDeck = (cardPool: any[], size: number = 60): GameCard[] => {
   const deck: GameCard[] = [];
   for (let i = 0; i < size; i++) {
